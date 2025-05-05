@@ -1,49 +1,35 @@
-use std::process::Output;
+use std::sync::Arc;
 
-use wgpu::wgc::instance;
-use wgpu::Instance;
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::event::{Event, WindowEvent, DeviceEvent, DeviceId};
+use winit::event_loop::{EventLoop, ActiveEventLoop};
+use winit::window::{Window, WindowId};
+use futures::executor::block_on;
 
 #[derive(Default)]
-struct App<'a> {
-    surface: Option<wgpu::Surface<'a>>,
-    queue: Option<wgpu::Queue>,
-    device: Option<wgpu::Device>,
-    window: Option<Window>,
-    instance: Option<Instance>,
+struct App {
+    window_state: Option<WindowState>,
 }
 
-impl<'a> App<'a> {
-    // fn default() -> App<'a> {
-    //     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-    //         backends: wgpu::Backends::PRIMARY,
-    //         ..Default::default()
-    //     });
+struct WindowState {
+    surface: wgpu::Surface<'static>,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
+    device: wgpu::Device,
+    window: Arc<Window>,
+    instance: wgpu::Instance,
+}
 
-    //     Self {
-    //         instance,
-    //         ..Default::default()
-    //     }
-    // }
-    fn default() -> App<'a> {
-        Self {
-            ..Default::default()
-        }
-    }
-
-    fn render(&mut self) {
-        let output = self.surface.as_ref().unwrap().get_current_texture().unwrap();
+impl WindowState {
+    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let output = self.surface.get_current_texture().unwrap();
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self
             .device
-            .as_ref()
-            .unwrap()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
@@ -70,51 +56,102 @@ impl<'a> App<'a> {
             });
         }
 
-        self.queue.as_ref().unwrap().submit(std::iter::once(encoder.finish()));
+        self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+
+        Ok(())
     }
 }
 
-impl ApplicationHandler for App<'_> {
-    fn resumed<'a>(&mut self, event_loop: &ActiveEventLoop) {
+impl ApplicationHandler for App {
+    // This is a common indicator that you can create a window.
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let win_attrs = Window::default_attributes();
+        let window = Arc::new(event_loop.create_window(win_attrs).unwrap());
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-                    backends: wgpu::Backends::PRIMARY,
-                    ..Default::default()
-                });
-        let window_attributes = WindowAttributes::default();
-        self.window = Some(event_loop.create_window(window_attributes).unwrap());
+            backends: wgpu::Backends::PRIMARY,
+            ..Default::default()
+        });
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
 
-        let test= self.window.as_ref().unwrap();
-        self.surface = Some(instance.create_surface(test).unwrap());
+        let adapter = block_on(instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })).unwrap();
+
+        let (device, queue) = block_on(adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    required_features: wgpu::Features::empty(),
+                    // WebGL doesn't support all of wgpu's features, so if
+                    // we're building for the web we'll have to disable some.
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: Default::default(),
+                    trace: wgpu::Trace::Off,
+                }
+            )).unwrap();
+
+        let surface_caps = surface.get_capabilities(&adapter);
+        // Shader code in this tutorial assumes an Srgb surface texture. Using a different
+        // one will result all the colors comming out darker. If you want to support non
+        // Srgb surfaces, you'll need to account for that when drawing to the frame.
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(surface_caps.formats[0]);
+        let size = window.inner_size();
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: surface_caps.present_modes[0],
+            alpha_mode: surface_caps.alpha_modes[0],
+            desired_maximum_frame_latency: 2,
+            view_formats: vec![],
+        };
+        surface.configure(&device, &config);
+        window.request_redraw();
+        self.window_state = Some(WindowState {
+            surface,
+            queue,
+            config,
+            size,
+            device,
+            window,
+            instance
+        })
+
     }
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+        // `unwrap` is fine, the window will always be available when
+        // receiving a window event.
+        // Handle window event.
+
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
                 event_loop.exit();
             },
-            WindowEvent::RedrawRequested => {
-                self.window.as_ref().unwrap().request_redraw();
-                self.render()
-            }
             _ => (),
         }
-    }
 
+        let window_state = self.window_state.as_mut().unwrap();
+        window_state.render();
+
+    }
+    fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: DeviceId, event: DeviceEvent) {
+        // Handle window event.
+    }
 }
 
 fn main() {
     let event_loop = EventLoop::new().unwrap();
-
-    // ControlFlow::Poll continuously runs the event loop, even if the OS hasn't
-    // dispatched any events. This is ideal for games and similar applications.
-    event_loop.set_control_flow(ControlFlow::Poll);
-
-    // ControlFlow::Wait pauses the event loop if no events are available to process.
-    // This is ideal for non-game applications that only update in response to user
-    // input, and uses significantly less power/CPU time than ControlFlow::Poll.
-    event_loop.set_control_flow(ControlFlow::Wait);
-
-    let mut app = App::default();
-    event_loop.run_app(&mut app);
+    let mut state = App::default();
+    let _ = event_loop.run_app(&mut state);
 }
