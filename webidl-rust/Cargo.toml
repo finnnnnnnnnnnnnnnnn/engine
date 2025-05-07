@@ -1,0 +1,9 @@
+[package]
+name = "webidl-rust"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+codegen = "0.2.0"
+convert_case = "0.8.0"
+weedle = "0.13.0"
