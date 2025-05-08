@@ -50,18 +50,21 @@ mod olkd;
 use std::{f32::INFINITY, panic::PanicHookInfo};
 
 use codegen as C;
-use weedle::{interface::InterfaceMember, literal::{ConstValue, FloatLit, IntegerLit}, types::{AttributedNonAnyType, AttributedType, ConstType, MayBeNull, NonAnyType}, CallbackInterfaceDefinition, Definition, DictionaryDefinition, InterfaceDefinition};
+use weedle::{argument::Argument, interface::InterfaceMember, literal::{ConstValue, FloatLit, IntegerLit}, types::{AttributedNonAnyType, AttributedType, ConstType, MayBeNull, NonAnyType, ReturnType, SingleType, Type, UnionMemberType, UnionType}, CallbackInterfaceDefinition, Definition, DictionaryDefinition, InterfaceDefinition};
 
+#[derive(Debug)]
 struct RustItems {
     structs: Vec<C::Struct>,
     impls: Vec<C::Impl>,
+    enums: Vec<C::Enum>,
 }
 
 impl RustItems {
     fn new() -> Self {
         Self {
             structs: Vec::new(),
-            impls: Vec::new()
+            impls: Vec::new(),
+            enums: Vec::new()
         }
     }
 
@@ -71,21 +74,21 @@ impl RustItems {
             match def {
                 CallbackInterface(callback_interface) => { self.add_from_callback_interface(callback_interface);},
                 Interface(interface) => { self.add_from_interface(interface); },
-                Dictionary(dictionary) => {self.add_from_dictionary(dictionary); }.
+                Dictionary(dictionary) => {self.add_from_dictionary(dictionary); },
                 _ => { panic!("unimplemented defintion"); }
             }
         }
     }
 
     fn add_from_callback_interface(&mut self, callback_interface: CallbackInterfaceDefinition) {
-        unimplemented!();
+        // unimplemented!();
     }
 
     fn add_from_interface(&mut self, interface: InterfaceDefinition) {
         let name = interface.identifier.0;
         let mut interface_struct = C::Struct::new(name);
         let mut interface_impl = C::Impl::new(name);
-        let mut interface_types: Vec<C::Enum>;
+        // let mut interface_types: Vec<C::Enum>;
         for member in interface.members.body {
             match member {
                 InterfaceMember::Const(const_field) => {
@@ -95,13 +98,26 @@ impl RustItems {
                     interface_impl.associate_const(name, ty, value, "pub");
                 },
                 InterfaceMember::Attribute(attribute) => {
+                    // println!("{:#?}", attribute);
                     let name = attribute.identifier.0;
-                    let ty = Self::handle_attributed_non_any_type(attribute.type_);
-                    interface_struct.field(name, ty)
+                    let ty = self.handle_attributed_type(attribute.type_);
+                    interface_struct.field(name, ty);
+                },
+                InterfaceMember::Operation(operation) => {
+                    let name = operation.identifier.expect("function has no name").0;
+                    let ty = self.handle_return_type(operation.return_type);
+                    let function = interface_impl.new_fn(name)
+                        .ret(ty);
+                    for (name, ty) in self.handle_args(operation.args.body.list){
+                        function.arg(name, ty);
+                    }
                 }
                 _ => {}
             }
         }
+        // println!("{:#?}", interface_struct);
+        self.structs.push(interface_struct);
+        self.impls.push(interface_impl);
 
         // //fields can be 
         // let interface_struct = C::Struct::new(name)
@@ -127,7 +143,32 @@ impl RustItems {
 
 
     fn add_from_dictionary(&mut self, dictionary: DictionaryDefinition) {
-        unimplemented!()
+        // unimplemented!()
+    }
+
+    fn handle_args<'a>(&mut self, args: Vec<Argument<'a>>) -> Vec<(&'a str, String)> {
+        args
+            .iter()
+            .map(
+                | arg | {
+                match arg {
+                    Argument::Single(single) => {
+                        (single.identifier.0, self.handle_attributed_type(single.type_.clone()))
+                    },
+                    Argument::Variadic(variadic) => {
+                        (variadic.identifier.0, self.handle_type_type(variadic.type_.clone()))
+                    }
+                }
+            }
+        )
+        .collect()
+    }
+
+    fn handle_return_type(&mut self, return_type: ReturnType) -> String{
+        match return_type {
+            ReturnType::Type(type_type) => { self.handle_type_type(type_type)},
+            ReturnType::Undefined(_) => { "None".to_string() }
+        }
     }
 
     fn handle_const_type(const_type: ConstType) -> String {
@@ -164,13 +205,14 @@ impl RustItems {
     }
 
 
-    fn get_type_name<T>(_: T) -> String {
-        use std::any::type_name;
-        type_name::<T>().to_string()
-    }
+    // fn get_type_name<T>(_: T) -> String {
+    //     use std::any::type_name;
+    //     type_name::<T>().to_string()
+    // }
 
     fn handle_may_be_null<T>(t: MayBeNull<T>) -> String {
         // refactor to use get_tyoe_name
+        // also this can not possible be correct
         use std::any::type_name;
         if t.q_mark.is_some() {
             type_name::<Option<T>>().to_string()
@@ -183,8 +225,45 @@ impl RustItems {
         Self::handle_non_any_type(atrributed_non_any_type.type_)
     }
 
-    fn handle_attributed_type(atrributed_type: AttributedType) -> String {
-        Self::get_type_name(atrributed_type.type_)
+    fn handle_attributed_type(&mut self, atrributed_type: AttributedType) -> String {
+        self.handle_type_type(atrributed_type.type_)
+    }
+
+    fn handle_type_type(&mut self, type_type: Type) -> String {
+        match  type_type {
+            Type::Single(single) => { Self::handle_single_type(single) },
+            Type::Union(union) => { self.handle_union_type(union.type_)}
+        }
+    }
+
+    fn handle_single_type(single_type: SingleType) -> String {
+        match single_type {
+            SingleType::Any(any_type) => { unimplemented!() },
+            SingleType::NonAny(non_any_type) => { Self::handle_non_any_type(non_any_type)}
+        }
+    }
+
+
+    fn handle_union_type(&mut self, union_type: UnionType) -> String {
+        let union_type_items = union_type.body.list;
+        let union_type_types: Vec<String> = union_type_items.iter().map(
+            |union_type| 
+            match union_type {
+                UnionMemberType::Single(single_type) => { Self::handle_attributed_non_any_type(single_type.clone()) },
+                UnionMemberType::Union(union_type) => { self.handle_union_type(union_type.type_.clone())}
+            }
+        )
+        .collect();
+        let name = union_type_types.join("Or");
+        let mut union_type_enum = C::Enum::new(&name);
+        let _ = union_type_types.iter().map(
+            | type_type | {
+                union_type_enum.new_variant(type_type)
+                    .tuple(&type_type);
+            }
+        );
+        self.enums.push(union_type_enum);
+        name
     }
 
     fn handle_non_any_type(non_any_type: NonAnyType) -> String {
@@ -287,6 +366,11 @@ impl RustItems {
 
 
 fn main() {
-    let items = RustItems::new();
-    items.add_from_defintions(definitions);
+    let mut items = RustItems::new();
+
+    let widl = std::fs::read_to_string("test.widl").unwrap();
+    let parsed = weedle::parse(&widl).unwrap();
+ 
+    items.add_from_defintions(parsed);
+    println!("{:#?}", items);
 }
