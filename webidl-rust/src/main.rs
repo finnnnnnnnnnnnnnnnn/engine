@@ -1,5 +1,5 @@
 mod olkd;
-use codegen as C;
+use codegen::{self as C, Impl, Struct};
 use weedle::{argument::Argument, interface::InterfaceMember, literal::{ConstValue, FloatLit, IntegerLit}, types::{AttributedNonAnyType, AttributedType, ConstType, MayBeNull, NonAnyType, ReturnType, SingleType, Type, UnionMemberType, UnionType}, CallbackInterfaceDefinition, Definition, DictionaryDefinition, InterfaceDefinition};
 
 fn main() {
@@ -19,10 +19,50 @@ struct CodeContainer {
     enums: Vec<C::Enum>,
 }
 
-trait InterfaceAttributes {
+trait ImplAttributes {
     fn associate_const<T: Into<codegen::Type>>(&mut self, name: impl Into<String>, ty: T, value: impl Into<String>, visibility: impl Into<String>) -> &mut Self;
+    fn new_fn(&mut self, name: &str) -> &mut codegen::Function;
 }
 
+trait StructAttributes {
+    fn field<T: Into<codegen::Type>>(&mut self, name: &str, ty: T) -> &mut Self;
+}
+
+impl StructAttributes for Struct {
+    fn field<T: Into<codegen::Type>>(&mut self, name: &str, ty: T) -> &mut Self {
+        C::Struct::field(self, name, ty)
+    }
+}
+
+
+impl ImplAttributes for C::Impl {
+    fn associate_const<T: Into<codegen::Type>>(&mut self, name: impl Into<String>, ty: T, value: impl Into<String>, visibility: impl Into<String>) -> &mut Self {
+        C::Impl::associate_const(self, name, ty, value, visibility)
+    }
+
+    fn new_fn(&mut self, name: &str) -> &mut codegen::Function {
+        C::Impl::new_fn(self, name)
+    }
+}
+
+impl ImplAttributes for C::Trait {
+    fn associate_const<T: Into<codegen::Type>>(&mut self, name: impl Into<String>, ty: T, value: impl Into<String>, visibility: impl Into<String>) -> &mut Self {
+        // this feels hacky
+        C::Trait::associated_const(self, name, ty);
+        self
+    }
+
+    fn new_fn(&mut self, name: &str) -> &mut codegen::Function {
+        C::Trait::new_fn(self, name)
+    }
+}
+
+impl StructAttributes for C::Trait {
+    fn field<T: Into<codegen::Type>>(&mut self, name: &str, ty: T) -> &mut Self {
+        let fn_setter_name = 
+        C::Trait::new_fn(&mut self, name)
+    }
+}
 impl CodeContainer {
     fn new() -> Self {
         Self {
@@ -48,7 +88,9 @@ impl CodeContainer {
     fn add_from_callback_interface(&mut self, callback_interface: CallbackInterfaceDefinition) {
         let name = callback_interface.identifier.0;
         let mut callback_trait = C::Trait::new(name);
-        callback_interface.members.body;
+        for member in callback_interface.members.body {
+            self.add_from_member(member, &mut callback_trait, &mut callback_trait);
+        }
         // pretty sure this is a trait I think maybe not totally sure though
         // I think this also means that the function param parsing code needs to search for these to determine if they are traits because otherwise it assumes they're types
         //          ... ntListener(DOMString type, EventListener? callback, optional (AddEventL ....
@@ -61,11 +103,32 @@ impl CodeContainer {
 
         // maybe we do have feintion sepciac types we construct which unwrap into the code container vec
 
-        unimplemented!();
+        // unimplemented!();
     }
 
-    fn add_from_member<M: InterfaceAttributes>(&mut self, member: T){
-        
+    fn add_from_member(&mut self, member: InterfaceMember<'_>, interface_impl: &mut impl ImplAttributes, interface_struct: &mut impl StructAttributes){
+        match member {
+            InterfaceMember::Const(const_field) => {
+                let name = const_field.identifier.0;
+                let ty = Self::handle_const_type(const_field.const_type);
+                let value = Self::handle_const_value(const_field.const_value);
+                interface_impl.associate_const(name, ty, value, "pub");
+            },
+            InterfaceMember::Attribute(attribute) => {
+                let name = attribute.identifier.0;
+                let ty = self.handle_attributed_type(attribute.type_);
+                interface_struct.field(name, ty);
+            },
+            InterfaceMember::Operation(operation) => {
+                let name = operation.identifier.expect("function has no name").0;
+                let ty = self.handle_return_type(operation.return_type);
+                let function = interface_impl.new_fn(name).ret(ty);
+                for (name, ty) in self.handle_args(operation.args.body.list){
+                    function.arg(name, ty);
+                }
+            }
+            _ => {}
+        }
     }
     fn add_from_interface(&mut self, interface: InterfaceDefinition) {
         let name = interface.identifier.0;
@@ -73,30 +136,7 @@ impl CodeContainer {
         let mut interface_impl = C::Impl::new(name);
         // let mut interface_types: Vec<C::Enum>;
         for member in interface.members.body {
-            match member {
-                InterfaceMember::Const(const_field) => {
-                    let name = const_field.identifier.0;
-                    let ty = Self::handle_const_type(const_field.const_type);
-                    let value = Self::handle_const_value(const_field.const_value);
-                    interface_impl.associate_const(name, ty, value, "pub");
-                },
-                InterfaceMember::Attribute(attribute) => {
-                    // println!("{:#?}", attribute);
-                    let name = attribute.identifier.0;
-                    let ty = self.handle_attributed_type(attribute.type_);
-                    interface_struct.field(name, ty);
-                },
-                InterfaceMember::Operation(operation) => {
-                    let name = operation.identifier.expect("function has no name").0;
-                    let ty = self.handle_return_type(operation.return_type);
-                    let function = interface_impl.new_fn(name)
-                        .ret(ty);
-                    for (name, ty) in self.handle_args(operation.args.body.list){
-                        function.arg(name, ty);
-                    }
-                }
-                _ => {}
-            }
+            self.add_from_member(member, &mut interface_impl, &mut interface_struct);
         }
         self.structs.push(interface_struct);
         self.impls.push(interface_impl);
