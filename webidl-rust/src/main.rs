@@ -1,255 +1,194 @@
-use std::collections::btree_set::Union;
-use std::fs;
-use codegen::Scope;
-use weedle::{interface::OperationInterfaceMember, Definition};
-use weedle::types::{NonAnyType as NAType, ReturnType as RType, SingleType as SType, Type as WType, UnionMemberType};
 
-fn main() {
-    let widl = fs::read_to_string("test.widl").unwrap();
-    let parsed = weedle::parse(&widl).unwrap();
-    let mut scope = Scope::new();
 
-    let interface_definition = parsed.iter().find_map(|d| match d {
-        Definition::Interface(interface) => Some(interface.to_owned()),
-        _=> None
-    }).expect("No interface found");
-    let interface = InterfaceConfig::new(interface_definition);
-    println!("{:#?}", interface);
+// fn main() {
+//     let widl = std::fs::read_to_string("test.widl").unwrap();
+//     let parsed = weedle::parse(&widl).unwrap();
+//     let intermidate = IntermediateStructure::new(parsed);
+// }
+
+// struct IntermediateStructure {
+//     callback_interfaces: Vec<RustCallbackInterface>,
+//     callbacks: Vec<RustCallback>,
+//     interfaces: Vec<RustInterface>,
+//     interface_mixins: Vec<RustInterfaceMixin>,
+//     namespaces: Vec<RustNamespace>,
+//     dictionaries: Vec<RustDictionary>
+//     // Namespace(NamespaceDefinition<'a>),
+//     // Dictionary(DictionaryDefinition<'a>),
+//     // PartialInterface(PartialInterfaceDefinition<'a>),
+//     // PartialInterfaceMixin(PartialInterfaceMixinDefinition<'a>),
+//     // PartialDictionary(PartialDictionaryDefinition<'a>),
+//     // PartialNamespace(PartialNamespaceDefinition<'a>),
+//     // Enum(EnumDefinition<'a>),
+//     // Typedef(TypedefDefinition<'a>),
+//     // IncludesStatement(IncludesStatementDefinition<'a>),
+//     // Implements(ImplementsDefinition<'a>),
+// }
+
+// impl IntermediateStructure {
+//     fn new(definitions: Vec<Definition>) -> Self {
+//         todo!()
+//     }
+// }
+
+// struct RustCallback {}
+// struct RustCallbackInterface {}
+// struct RustInterface {}
+// struct RustInterfaceMixin {}
+// struct RustNamespace {}
+// struct RustDictionary {}
+// struct RustPartialInterface {}
+// struct RustPartialInterfaceMixin {}
+// struct RustPartialDictionary {}
+// struct RustPartialNamespace {}
+// struct RustEnum {}
+// struct RustTypedef {}
+// struct RustIncludesStatement {}
+// struct RustImplements {}
+
+mod olkd;
+use std::{f32::INFINITY, panic::PanicHookInfo};
+
+use codegen as C;
+use weedle::{interface::InterfaceMember, literal::{ConstValue, FloatLit, IntegerLit}, types::{AttributedNonAnyType, AttributedType, ConstType, MayBeNull, NonAnyType}, CallbackInterfaceDefinition, Definition, DictionaryDefinition, InterfaceDefinition};
+
+struct RustItems {
+    structs: Vec<C::Struct>,
+    impls: Vec<C::Impl>,
 }
 
-
-#[derive(Debug)]
-struct InterfaceMethod {
-    name: String,
-    return_type: String,
-    params: Vec<InterfaceMethodParam>
-}
-
-#[derive(Debug, Clone)]
-struct InterfaceField {
-    field_name: String,
-    field_type: String
-}
-
-#[derive(Debug, Clone)]
-struct InterfaceStruct {
-    name: String,
-    fields: Vec<InterfaceField>
-}
-#[derive(Debug)]
-struct InterfaceImpl {
-    methods: Vec<InterfaceMethod>
-}
-#[derive(Debug)]
-struct InterfaceEnum {}
-#[derive(Debug)]
-struct InterfaceConfig {
-    interface_struct: InterfaceStruct,
-    interface_impl: InterfaceImpl,
-    interface_enums: Vec<UnionTypeEnum>
-}
-
-
-impl InterfaceConfig {
-    fn new(interface: weedle::InterfaceDefinition) -> InterfaceConfig{
-        let name = interface.identifier.0.to_string();
-        let InterfaceMembers { 
-            fields,
-            methods,
-            enums
-        } = InterfaceMembers::from_interface(interface);
-        
-        let interface_struct = InterfaceStruct {
-            name,
-            fields
-        };
-        let interface_impl = InterfaceImpl {
-                methods: methods
-        };
+impl RustItems {
+    fn new() -> Self {
         Self {
-            interface_struct,
-            interface_impl,
-            interface_enums: enums
+            structs: Vec::new(),
+            impls: Vec::new()
         }
     }
-}
 
-#[derive(Debug)]
-struct InterfaceMembers {
-    methods: Vec<InterfaceMethod>,
-    fields: Vec<InterfaceField>,
-    enums: Vec<UnionTypeEnum>
-}
+    fn add_from_defintions(&mut self, definitions: Vec<Definition>) {
+        use weedle::Definition::*;
+        for def in definitions {
+            match def {
+                CallbackInterface(callback_interface) => { self.add_from_callback_interface(callback_interface);},
+                Interface(interface) => { self.add_from_interface(interface); },
+                Dictionary(dictionary) => {self.add_from_dictionary(dictionary); }.
+                _ => { panic!("unimplemented defintion"); }
+            }
+        }
+    }
 
-impl InterfaceMembers {
-    fn from_interface(interface: weedle::InterfaceDefinition) -> Self {
-        let members_vec = interface.members.body;
-        let mut interface_methods: Vec<InterfaceMethod> = Vec::new();
-        let mut interface_fields: Vec<InterfaceField> = Vec::new();
-        let mut interface_enums: Vec<UnionTypeEnum> = Vec::new();
+    fn add_from_callback_interface(&mut self, callback_interface: CallbackInterfaceDefinition) {
+        unimplemented!();
+    }
 
-        use weedle::interface::InterfaceMember as IM;
-        for method in members_vec {
-            match method {
-                IM::Operation(operation) => {
-                    let method_name: String = operation.identifier.expect("Method has no name?").0.to_owned();
-                    let mut method_params = InterfaceMethodParam::from_method(operation.clone());
-                    let method_type = IDLTypeAsString::from_return_type(&operation.return_type);
-                    interface_methods.push(
-                        InterfaceMethod {
-                            name: method_name,
-                            return_type: method_type.0.clone(),
-                            params: method_params.0
-                        }
-                    );
-                    if let Some(union_type_enum) = method_type.1 {
-                        interface_enums.push(union_type_enum);
-                    }
-                    interface_enums.append(&mut method_params.1);
+    fn add_from_interface(&mut self, interface: InterfaceDefinition) {
+        let name = interface.identifier.0;
+        let mut interface_struct = C::Struct::new(name);
+        let mut interface_impl = C::Impl::new(name);
+        let mut interface_types: Vec<C::Enum>;
+        for member in interface.members.body {
+            match member {
+                InterfaceMember::Const(const_field) => {
+                    let name = const_field.identifier.0;
+                    let ty = Self::handle_const_type(const_field.const_type);
+                    let value = Self::handle_const_value(const_field.const_value);
+                    interface_impl.associate_const(name, ty, value, "pub");
                 },
-                IM::Attribute(attribute) => {
-                    let field_name: String = attribute.identifier.0.to_string();
-                    let field_type = IDLTypeAsString::from_wtype(&attribute.type_.type_);
-                    println!("{:#?}", field_type);
-                    interface_fields.push(
-                        InterfaceField {
-                            field_name,
-                            field_type: field_type.0.clone()
-                        }
-                    );
-                    if let Some(union_type_enum) = field_type.1 {
-                        interface_enums.push(union_type_enum);
-                    }
+                InterfaceMember::Attribute(attribute) => {
+                    let name = attribute.identifier.0;
+                    let ty = Self::handle_attributed_non_any_type(attribute.type_);
+                    interface_struct.field(name, ty)
                 }
-                _ => {
-                    ()
-                    // unimplemented!();
-                }
+                _ => {}
             }
         }
 
-        InterfaceMembers { 
-            methods: interface_methods,
-            fields: interface_fields,
-            enums: interface_enums
-        }
+        // //fields can be 
+        // let interface_struct = C::Struct::new(name)
+        //     .field(name, ty)
 
+        // The rust code for an interface can invole creating many different types and not just adding fields to a struct
+        // pub enum InterfaceMember<'a> {
+        //     Const(ConstMember<'a>), => constant field, definted in impl
+        //     Attribute(AttributeInterfaceMember<'a>), => regular field, can be readonly though, definted in struct
+        //     Constructor(ConstructorInterfaceMember<'a>), => 'new' function, defined in impl
+        //     Operation(OperationInterfaceMember<'a>), => regular function, definted in impl
+        //     Iterable(IterableInterfaceMember<'a>), => I've never actually seen this before, though I assume it would be best handled with a trait, it's going to remain unimplemented until I encounter it though
+        //     AsyncIterable(AsyncIterableInterfaceMember<'a>), => same as iteraple
+        //     Maplike(MaplikeInterfaceMember<'a>), => same
+        //     Setlike(SetlikeInterfaceMember<'a>), => same
+        //     Stringifier(StringifierMember<'a>), => same, this is probaly as best handled as a trait thing.
+        // }
+
+        //plan for the add_from_interface function:
+            // define an empty struct, option<impl>, and vec<enum>
+            // pass these into functions which handle the differnet type of interface members and modify
     }
-}
 
-#[derive(Debug)]
-struct InterfaceMethodParam {
-    param_name: String,
-    param_type: String
-}
-impl InterfaceMethodParam {
-    fn from_method(method: OperationInterfaceMember) -> (Vec<Self>, Vec<UnionTypeEnum>) {
-        let arguments_vec = method.args.body.list;
-        let mut method_params: Vec<Self> = Vec::new();
-        let mut method_param_union_type_enums: Vec<UnionTypeEnum> = Vec::new();
 
-        use weedle::argument::Argument as A;
-        for argument in arguments_vec {
-            match argument {
-                A::Single(single ) => {
-                    let param_name = single.identifier.0.to_string();
-                    let param_type = IDLTypeAsString::from_wtype(&single.type_.type_);
-                    method_params.push(
-                        Self {
-                            param_name,
-                            param_type: param_type.0
-                        }
-                    );
-                    if let Some(union_type_enum) = param_type.1 {
-                        method_param_union_type_enums.push(union_type_enum);
-                    }
-                },
-                A::Variadic(variadic) => {
-                    unimplemented!();
+    fn add_from_dictionary(&mut self, dictionary: DictionaryDefinition) {
+        unimplemented!()
+    }
+
+    fn handle_const_type(const_type: ConstType) -> String {
+        match const_type {
+            ConstType::Boolean(t) => { Self::handle_may_be_null(t)},
+            ConstType::Byte(t) => { Self::handle_may_be_null(t)},
+            ConstType::FloatingPoint(t) => { Self::handle_may_be_null(t)},
+            ConstType::Integer(t) => { Self::handle_may_be_null(t)},
+            ConstType::Identifier(t) => { Self::handle_may_be_null(t)},
+            ConstType::Octet(t) => { Self::handle_may_be_null(t)},
+        }
+    }
+
+    fn handle_const_value(const_value: ConstValue) -> String {
+        match const_value {
+            ConstValue::Boolean(t) => {t.0.to_string()},
+            ConstValue::Float(t) => { 
+                match t {
+                    FloatLit::Infinity(_) => { "INFINITY".to_string() },
+                    FloatLit::NegInfinity(_) => { "NEG_INFINITY".to_string() },
+                    FloatLit::Value(value) => {value.0.to_string()},
+                    FloatLit::NaN(_) => { "NAN".to_string() },
                 }
-            }
-        }
-        (method_params, method_param_union_type_enums)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct UnionTypeEnum {
-    name: String,
-    options: Vec<String>
-}
-
-#[derive(Debug)]
-struct UnionType {}
-impl UnionType {
-    fn from_union_types(w_union_types: Vec<UnionMemberType>) -> (String, Option<UnionTypeEnum>) {
-        fn get_union_types(union_types: Vec<UnionMemberType>, union_type_names: &mut Vec<String>) {
-            for ut in union_types {
-                match ut {
-                    UnionMemberType::Single(single) => {
-                        let union_type = IDLTypeAsString::from_non_any_type(&single.type_);
-                        union_type_names.push(union_type);
-                    },
-                    UnionMemberType::Union(union) => {
-                        let union_types_vec = union.type_.body.list;
-                        get_union_types(union_types_vec, union_type_names);
-                    }
-                }
-            }
-        }
-        let mut union_types: Vec<String> = Vec::new();
-        get_union_types(w_union_types, &mut union_types);
-        let union_type_name = union_types.join("Or");
-        let union_type_enum = UnionTypeEnum {
-            name: union_type_name.clone(),
-            options: union_types
-        };
-        // println!("{:#?}", union_type_enum);
-        (union_type_name, Some(union_type_enum))
-    }
-}
-
-type TypeAsStringAndMaybeUnionEnum = (String, Option<UnionTypeEnum>);
-struct IDLTypeAsString {}
-impl IDLTypeAsString {
-    fn from_return_type(return_type: &RType) -> TypeAsStringAndMaybeUnionEnum {
-        match return_type {
-            RType::Type(return_type) => {
-                Self::from_wtype(&return_type)
             },
-            RType::Undefined(_) => {
-                ("".to_owned(), None)
-            }
-        }
-    }
-
-    fn from_wtype(weedle_type: &WType) -> TypeAsStringAndMaybeUnionEnum {
-        match weedle_type {
-            WType::Single(single) => {
-                (Self::from_single_type(single), None)
+            ConstValue::Integer(t) => {
+                match t {
+                    IntegerLit::Dec(dec) => {dec.0.to_string()},
+                    IntegerLit::Hex(hex) => {hex.0.to_string()},
+                    IntegerLit::Oct(oct) => {oct.0.to_string()},
+                }
             },
-            WType::Union(union) => {
-                let types = union.type_.body.list.clone();
-                let result = UnionType::from_union_types(types);
-                // println!("{:#?}", result);
-                result
-            }
+            ConstValue::Null(_) => { "None".to_string() },
         }
     }
 
-    fn from_single_type(single_type: &SType) -> String {
-        match single_type {
-            SType::Any(any) => {
-                todo!();
-            },
-            SType::NonAny(non_any) => {
-                Self::from_non_any_type(non_any)
-            }
+
+    fn get_type_name<T>(_: T) -> String {
+        use std::any::type_name;
+        type_name::<T>().to_string()
+    }
+
+    fn handle_may_be_null<T>(t: MayBeNull<T>) -> String {
+        // refactor to use get_tyoe_name
+        use std::any::type_name;
+        if t.q_mark.is_some() {
+            type_name::<Option<T>>().to_string()
+        } else {
+            type_name::<T>().to_string()
         }
     }
 
-    fn from_non_any_type(non_any_type: &NAType) -> String {
-        use weedle::types::NonAnyType;
+    fn handle_attributed_non_any_type(atrributed_non_any_type: AttributedNonAnyType) -> String {
+        Self::handle_non_any_type(atrributed_non_any_type.type_)
+    }
+
+    fn handle_attributed_type(atrributed_type: AttributedType) -> String {
+        Self::get_type_name(atrributed_type.type_)
+    }
+
+    fn handle_non_any_type(non_any_type: NonAnyType) -> String {
+        // this is pretty jank
         match non_any_type {
             NonAnyType::Promise(v) => {
                 unimplemented!();
@@ -340,4 +279,14 @@ impl IDLTypeAsString {
             },
         }.into()
     }
+
+
+
+    // fn handle
+}
+
+
+fn main() {
+    let items = RustItems::new();
+    items.add_from_defintions(definitions);
 }
