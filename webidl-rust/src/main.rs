@@ -1,65 +1,28 @@
-
-
-// fn main() {
-//     let widl = std::fs::read_to_string("test.widl").unwrap();
-//     let parsed = weedle::parse(&widl).unwrap();
-//     let intermidate = IntermediateStructure::new(parsed);
-// }
-
-// struct IntermediateStructure {
-//     callback_interfaces: Vec<RustCallbackInterface>,
-//     callbacks: Vec<RustCallback>,
-//     interfaces: Vec<RustInterface>,
-//     interface_mixins: Vec<RustInterfaceMixin>,
-//     namespaces: Vec<RustNamespace>,
-//     dictionaries: Vec<RustDictionary>
-//     // Namespace(NamespaceDefinition<'a>),
-//     // Dictionary(DictionaryDefinition<'a>),
-//     // PartialInterface(PartialInterfaceDefinition<'a>),
-//     // PartialInterfaceMixin(PartialInterfaceMixinDefinition<'a>),
-//     // PartialDictionary(PartialDictionaryDefinition<'a>),
-//     // PartialNamespace(PartialNamespaceDefinition<'a>),
-//     // Enum(EnumDefinition<'a>),
-//     // Typedef(TypedefDefinition<'a>),
-//     // IncludesStatement(IncludesStatementDefinition<'a>),
-//     // Implements(ImplementsDefinition<'a>),
-// }
-
-// impl IntermediateStructure {
-//     fn new(definitions: Vec<Definition>) -> Self {
-//         todo!()
-//     }
-// }
-
-// struct RustCallback {}
-// struct RustCallbackInterface {}
-// struct RustInterface {}
-// struct RustInterfaceMixin {}
-// struct RustNamespace {}
-// struct RustDictionary {}
-// struct RustPartialInterface {}
-// struct RustPartialInterfaceMixin {}
-// struct RustPartialDictionary {}
-// struct RustPartialNamespace {}
-// struct RustEnum {}
-// struct RustTypedef {}
-// struct RustIncludesStatement {}
-// struct RustImplements {}
-
 mod olkd;
-use std::{f32::INFINITY, panic::PanicHookInfo};
-
 use codegen as C;
 use weedle::{argument::Argument, interface::InterfaceMember, literal::{ConstValue, FloatLit, IntegerLit}, types::{AttributedNonAnyType, AttributedType, ConstType, MayBeNull, NonAnyType, ReturnType, SingleType, Type, UnionMemberType, UnionType}, CallbackInterfaceDefinition, Definition, DictionaryDefinition, InterfaceDefinition};
 
+fn main() {
+    let mut items = CodeContainer::new();
+
+    let widl = std::fs::read_to_string("test.widl").unwrap();
+    let parsed = weedle::parse(&widl).unwrap();
+ 
+    items.add_from_defintions(parsed);
+    println!("{:#?}", items);
+}
+
 #[derive(Debug)]
-struct RustItems {
+struct CodeContainer {
     structs: Vec<C::Struct>,
     impls: Vec<C::Impl>,
     enums: Vec<C::Enum>,
 }
 
-impl RustItems {
+trait InterfaceAttributes {
+    fn associate_const<T: Into<codegen::Type>>(&mut self, name: impl Into<String>, ty: T, value: impl Into<String>, visibility: impl Into<String>) -> &mut Self;
+}
+impl CodeContainer {
     fn new() -> Self {
         Self {
             structs: Vec::new(),
@@ -69,6 +32,7 @@ impl RustItems {
     }
 
     fn add_from_defintions(&mut self, definitions: Vec<Definition>) {
+        // what should I name this function?
         use weedle::Definition::*;
         for def in definitions {
             match def {
@@ -81,7 +45,22 @@ impl RustItems {
     }
 
     fn add_from_callback_interface(&mut self, callback_interface: CallbackInterfaceDefinition) {
-        // unimplemented!();
+        let name = callback_interface.identifier.0;
+        let mut callback_trait = C::Trait::new(name);
+        callback_interface.members.body;
+        // pretty sure this is a trait I think maybe not totally sure though
+        // I think this also means that the function param parsing code needs to search for these to determine if they are traits because otherwise it assumes they're types
+        //          ... ntListener(DOMString type, EventListener? callback, optional (AddEventL ....
+        //                                           ^^^^^^^^^ <-- this right here
+        // also the ? means it's an optialnal generic too!!!! And I've totally ignored that in parsing types
+        // probably good to map the dependency chain so parsing defintions can be done in the correct order
+        // also I'd like to more rigoursly handle types, though I feel like static typing makes this difficult
+        //      -> I wonder if I could generate the code and then compile as the program is running to check the types 
+        //      -> Also this defintily means I need big type maps yayyyyyyy!!!!!!!! -> could I do something with alias'?
+
+        // maybe we do have feintion sepciac types we construct which unwrap into the code container vec
+
+        unimplemented!();
     }
 
     fn add_from_interface(&mut self, interface: InterfaceDefinition) {
@@ -115,30 +94,8 @@ impl RustItems {
                 _ => {}
             }
         }
-        // println!("{:#?}", interface_struct);
         self.structs.push(interface_struct);
         self.impls.push(interface_impl);
-
-        // //fields can be 
-        // let interface_struct = C::Struct::new(name)
-        //     .field(name, ty)
-
-        // The rust code for an interface can invole creating many different types and not just adding fields to a struct
-        // pub enum InterfaceMember<'a> {
-        //     Const(ConstMember<'a>), => constant field, definted in impl
-        //     Attribute(AttributeInterfaceMember<'a>), => regular field, can be readonly though, definted in struct
-        //     Constructor(ConstructorInterfaceMember<'a>), => 'new' function, defined in impl
-        //     Operation(OperationInterfaceMember<'a>), => regular function, definted in impl
-        //     Iterable(IterableInterfaceMember<'a>), => I've never actually seen this before, though I assume it would be best handled with a trait, it's going to remain unimplemented until I encounter it though
-        //     AsyncIterable(AsyncIterableInterfaceMember<'a>), => same as iteraple
-        //     Maplike(MaplikeInterfaceMember<'a>), => same
-        //     Setlike(SetlikeInterfaceMember<'a>), => same
-        //     Stringifier(StringifierMember<'a>), => same, this is probaly as best handled as a trait thing.
-        // }
-
-        //plan for the add_from_interface function:
-            // define an empty struct, option<impl>, and vec<enum>
-            // pass these into functions which handle the differnet type of interface members and modify
     }
 
 
@@ -147,6 +104,7 @@ impl RustItems {
     }
 
     fn handle_args<'a>(&mut self, args: Vec<Argument<'a>>) -> Vec<(&'a str, String)> {
+        // this creeps toward a pattenr I think I don't like. would i be better to pass in the function with the arguments? Maybe a Function container is needed?
         args
             .iter()
             .map(
@@ -256,12 +214,10 @@ impl RustItems {
         .collect();
         let name = union_type_types.join("Or");
         let mut union_type_enum = C::Enum::new(&name);
-        let _ = union_type_types.iter().map(
-            | type_type | {
-                union_type_enum.new_variant(type_type)
-                    .tuple(&type_type);
-            }
-        );
+        for type_type in union_type_types {
+            union_type_enum.new_variant(type_type.clone()) //you get a clone!
+                .tuple(&type_type);
+        }
         self.enums.push(union_type_enum);
         name
     }
@@ -362,15 +318,4 @@ impl RustItems {
 
 
     // fn handle
-}
-
-
-fn main() {
-    let mut items = RustItems::new();
-
-    let widl = std::fs::read_to_string("test.widl").unwrap();
-    let parsed = weedle::parse(&widl).unwrap();
- 
-    items.add_from_defintions(parsed);
-    println!("{:#?}", items);
 }
