@@ -22,6 +22,7 @@ struct CodeContainer {
 trait InterfaceAttributes {
     fn associate_const<T: Into<codegen::Type>>(&mut self, name: impl Into<String>, ty: T, value: impl Into<String>, visibility: impl Into<String>) -> &mut Self;
 }
+
 impl CodeContainer {
     fn new() -> Self {
         Self {
@@ -63,6 +64,9 @@ impl CodeContainer {
         unimplemented!();
     }
 
+    fn add_from_member<M: InterfaceAttributes>(&mut self, member: T){
+        
+    }
     fn add_from_interface(&mut self, interface: InterfaceDefinition) {
         let name = interface.identifier.0;
         let mut interface_struct = C::Struct::new(name);
