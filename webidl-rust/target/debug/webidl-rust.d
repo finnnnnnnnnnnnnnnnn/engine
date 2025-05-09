@@ -1,1 +1,1 @@
-/Users/finbar/dev/engine/webidl-rust/target/debug/webidl-rust: /Users/finbar/dev/engine/webidl-rust/src/lib.rs /Users/finbar/dev/engine/webidl-rust/src/main.rs
+/Users/finbar/dev/engine/webidl-rust/target/debug/webidl-rust: /Users/finbar/dev/engine/webidl-rust/inherit_derive/src/lib.rs /Users/finbar/dev/engine/webidl-rust/inherit_derive/src/struct_.rs /Users/finbar/dev/engine/webidl-rust/inherit_derive/src/utils.rs /Users/finbar/dev/engine/webidl-rust/src/main.rs
