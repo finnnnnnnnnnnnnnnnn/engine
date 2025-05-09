@@ -43,6 +43,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "inherit_derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -111,6 +119,7 @@ version = "0.1.0"
 dependencies = [
  "codegen",
  "convert_case",
+ "inherit_derive",
  "quote",
  "syn",
  "weedle",
