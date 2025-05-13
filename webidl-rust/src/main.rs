@@ -1,15 +1,17 @@
 // use inherit_derive::inherit;
 
 use webidl_rust::inherit;
+
+#[derive(Debug)]
 struct InterfaceParent {
     field: &'static str
 }
 
 #[inherit(InterfaceParent)]
+#[derive(Debug)]
 struct Interface {
     other_field: &'static str
 }
-
 
 // ok so the thing is there are sort of basically the same things.
 // when you interact with an interface with a parent you can do pretty much what you do with a normal interface there's just an extra field
@@ -20,9 +22,10 @@ struct Interface {
 
 fn main() {
     let test_interface = Interface {
-        // field: "test",
+        field: "test",
         other_field: "test"
     };
+    println!("{:#?}", test_interface);
 }
 
 // planning
