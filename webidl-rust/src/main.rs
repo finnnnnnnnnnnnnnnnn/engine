@@ -22,6 +22,7 @@ struct Interface {
 
 fn main() {
     let test_interface = Interface {
+        parent: InterfaceParent, 
         field: "test",
         other_field: "test"
     };

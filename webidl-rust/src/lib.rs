@@ -49,9 +49,9 @@ pub fn inherit(parent_struct: TokenStream, input: TokenStream) -> TokenStream {
         for field in parent_fields  {
                 fields.named.insert(0, field.clone());
         }
+        let parser = syn::Field::parse_named;
+        let field = parser.parse_str(&["parent:", &parent_struct_name].concat()).unwrap();
         fields.named.insert(0, field);
-        field = 
-        // how do I make a field??
     }
 
     
