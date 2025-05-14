@@ -1,8 +1,10 @@
 [package]
-name = "webidl-rust"
+name = "webidl-derive"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+proc-macro = true
 
 [dependencies]
 codegen = "0.2.0"
@@ -12,4 +14,3 @@ quote = "1.0.40"
 static_assertions = "1.1.0"
 syn = { version = "2.0.101", features = ["full", "extra-traits"] }
 weedle = "0.13.0"
-webidl-derive = { path = "webidl-derive"}

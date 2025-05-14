@@ -14,9 +14,11 @@ pub fn inherit(parent_struct: TokenStream, input: TokenStream) -> TokenStream {
     // I need to get all of the types that are in scope and search for the one from the args
     // this seems like too much work I'm just going to parse the file for all structs for now.
 
-    let mut path: PathBuf = env!("CARGO_MANIFEST_DIR").into();
-    path.push(proc_macro::Span::call_site().file());
-    let content = std::fs::read_to_string(path).unwrap();
+    // let mut path: PathBuf = env!("CARGO_MANIFEST_DIR").into();
+    // path.push(proc_macro::Span::call_site().file());
+    // println!("{:#?}", path);
+    let path: PathBuf = proc_macro::Span::call_site().file().into();
+    let content = std::fs::read_to_string(path).expect("here?");
 
     let ast = syn::parse_file(&content).unwrap();
     let structs: Vec<&ItemStruct> = ast.items

@@ -1,7 +1,8 @@
 // use inherit_derive::inherit;
 
-use webidl_rust::inherit;
-use webidl_rust::tlborm_fn_macro;
+// use webidl_rust::inherit;
+// use webidl_rust::tlborm_fn_macro;
+use webidl_derive::{inherit, tlborm_fn_macro};
 
 #[derive(Debug)]
 struct InterfaceParent {
