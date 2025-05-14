@@ -1,6 +1,7 @@
 // use inherit_derive::inherit;
 
 use webidl_rust::inherit;
+use webidl_rust::tlborm_fn_macro;
 
 #[derive(Debug)]
 struct InterfaceParent {
@@ -13,22 +14,44 @@ struct Interface {
     other_field: &'static str
 }
 
-// ok so the thing is there are sort of basically the same things.
-// when you interact with an interface with a parent you can do pretty much what you do with a normal interface there's just an extra field
-// maybe instead of this extra type layer, parent just becomes a reserved field of an interface?
-// I may need to write some weird trait stuff later but I think this should work for now
-
-
+tlborm_fn_macro!(
+    interface EventTarget {
+        undefined addEventListener(DOMString type, EventListener? callback, optional (AddEventListenerOptions or boolean) options = {});
+    };
+);
 
 fn main() {
     let test_interface = Interface {
-        parent: InterfaceParent, 
         field: "test",
         other_field: "test"
     };
     println!("{:#?}", test_interface);
+    println!("{:#?}", EventTarget {})
 }
 
 // planning
+// I'm getting focused on the parser again.
+// Let me think about how I'm going to do this.
+// How is this going to actually be used?
+// macro will be written with input widl
+// this expands out to a struct and a trait
+//   -> since the macro can't write the implementation obviously
+// need some way to gurantee the trait is implemented
+// what does this look like
 
-// Despite now being able to inheritance everything probaly still needs to be a generic from of a some kind of object type because we also need to store a reference to a parent I think
+// from_widl!(
+//     interface EventTarget {
+//         undefined addEventListener(DOMString type, EventListener? callback, optional (AddEventListenerOptions or boolean) options = {});
+//     };
+// );
+
+// ->
+
+//https://docs.rs/static_assertions/latest/static_assertions/macro.assert_impl_all.html
+
+// struct EventTarget {}
+// trait EventTargetImpl {
+//      fn add_event_listener(...) -> ...
+// }
+// assert_impl_all!(EventTarget: EventTargetImpl);
+

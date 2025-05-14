@@ -1,15 +1,15 @@
-[package]
-name = "engine"
-version = "0.1.0"
-edition = "2024"
+# [package]
+# name = "engine"
+# version = "0.1.0"
+# edition = "2024"
 
-[dependencies]
-glfw = "0.59.0"
-glm = "0.2.3"
-imstr = "0.2.0"
-pollster = "0.4.0"
-readonly = "0.2.13"
-scalar-value-string = "1.0.1"
-tl = "0.7.8"
-wgpu = "25.0.0"
-wgpu_text = "0.9.3"
+# [dependencies]
+# glfw = "0.59.0"
+# glm = "0.2.3"
+# imstr = "0.2.0"
+# pollster = "0.4.0"
+# readonly = "0.2.13"
+# scalar-value-string = "1.0.1"
+# tl = "0.7.8"
+# wgpu = "25.0.0"
+# wgpu_text = "0.9.3"
