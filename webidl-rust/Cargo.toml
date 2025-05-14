@@ -11,5 +11,6 @@ codegen = "0.2.0"
 convert_case = "0.8.0"
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
+static_assertions = "1.1.0"
 syn = { version = "2.0.101", features = ["full", "extra-traits"] }
 weedle = "0.13.0"

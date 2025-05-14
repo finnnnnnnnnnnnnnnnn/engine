@@ -71,13 +71,14 @@ use weedle::{argument::Argument, interface::InterfaceMember, literal::{ConstValu
 
 fn gen_interface(interface: weedle::InterfaceDefinition) -> TokenStream {
     let interface_name = Ident::new(interface.identifier.0, proc_macro2::Span::call_site());
+    let interface_trait_name = Ident::new(&[interface.identifier.0, "Trait"].concat(), proc_macro2::Span::call_site());
     let interface_methods = interface.members.body
         .iter()
         .filter_map( | member | {
             match member {
                 InterfaceMember::Operation(operation) => {
                     let name = Ident::new(operation.identifier.expect("function has no name").0, proc_macro2::Span::call_site());
-                    let ty = Ident::new(&get_return_type(operation.return_type), proc_macro2::Span::call_site());
+                    let ty = Ident::new(&get_return_type(operation.return_type.clone()), proc_macro2::Span::call_site());
 
                     // for (name, ty) in self.handle_args(operation.args.body.list){
                     //     function.arg(name, ty);
@@ -90,16 +91,20 @@ fn gen_interface(interface: weedle::InterfaceDefinition) -> TokenStream {
                 },
                 _ => { None }
             }
-        })
+        });
 
-    quote! {
+    let out = quote! {
+        #[derive(Debug)]
         struct #interface_name {
         }
 
-        trait #interface_name {
+        trait #interface_trait_name {
 
         }
-    }.into()
+        static_assertions::assert_impl_all!(#interface_name: #interface_trait_name); //will this work
+    };
+    println!("{:#?}", out);
+    out.into()
 }
 
 fn get_return_type(return_type: ReturnType) -> String{
@@ -136,12 +141,12 @@ fn get_union_type(union_type: UnionType) -> String {
     )
     .collect();
     let name = union_type_types.join("Or");
-    let mut union_type_enum = C::Enum::new(&name);
-    for type_type in union_type_types {
-        union_type_enum.new_variant(type_type.clone()) //you get a clone!
-            .tuple(&type_type);
-    }
-    self.enums.push(union_type_enum);
+    // let mut union_type_enum = C::Enum::new(&name);
+    // for type_type in union_type_types {
+    //     union_type_enum.new_variant(type_type.clone()) //you get a clone!
+    //         .tuple(&type_type);
+    // }
+    // self.enums.push(union_type_enum);
     name
 }
 
@@ -149,7 +154,7 @@ fn get_attributed_non_any_type(atrributed_non_any_type: AttributedNonAnyType) ->
     get_non_any_type(atrributed_non_any_type.type_)
 }
 
-fn get_attributed_type(&mut self, atrributed_type: AttributedType) -> String {
+fn get_attributed_type(atrributed_type: AttributedType) -> String {
     get_type_type(atrributed_type.type_)
 }
 

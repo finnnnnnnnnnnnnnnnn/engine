@@ -20,6 +20,9 @@ tlborm_fn_macro!(
     };
 );
 
+impl EventTargetTrait for EventTarget {
+}
+
 fn main() {
     let test_interface = Interface {
         field: "test",
